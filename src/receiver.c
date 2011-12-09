@@ -40,6 +40,8 @@ struct _SockMuxReceiver {
   GByteArray    *input_buf;
   guchar         input_read_buffer[8192];
   GCancellable  *input_cancellable;
+  gboolean       handshake_received;
+  guint          protocol_version;
 
   GSList *callbacks;
 };
@@ -47,6 +49,7 @@ struct _SockMuxReceiver {
 static GObjectClass *parent_class = NULL;
 
 enum {
+  SIGNAL_PROTOCOL_ERROR,
   SIGNAL_STREAM_END,
   SIGNAL_LAST
 };
@@ -98,13 +101,19 @@ dispatch_message (SockMuxReceiver *receiver)
   msg = (SockMuxMessage *) receiver->input_buf->data;
   available_len = receiver->input_buf->len;
 
-  if (available_len < sizeof(msg))
+  if (available_len < sizeof(*msg))
     return 0;
+
+  if (GUINT_FROM_BE(msg->magic) != SOCKMUX_PROTOCOL_MAGIC)
+    {
+      g_signal_emit(receiver, signals[SIGNAL_PROTOCOL_ERROR], 0);
+      return 0;
+    }
 
   msg_len = GUINT_FROM_BE(msg->length);
   msg_id = GUINT_FROM_BE(msg->message_id);
 
-  if (available_len < msg_len + sizeof(msg))
+  if (available_len < msg_len + sizeof(*msg))
     return 0;
 
   /* walk the list of callbacks and see if anyone is interessted */
@@ -116,13 +125,31 @@ dispatch_message (SockMuxReceiver *receiver)
         cb->func(receiver, msg_id, msg->data, msg_len, cb->userdata);
     }
 
-  return msg_len + sizeof(msg);
+  return msg_len + sizeof(*msg);
 }
 
 static void
 dispatch_input (SockMuxReceiver *receiver)
 {
   gint len;
+
+  if (G_UNLIKELY(!receiver->handshake_received))
+    {
+      SockMuxHandshake *hs = (SockMuxHandshake *) receiver->input_buf->data;
+      if (GUINT_FROM_BE(hs->magic) != SOCKMUX_PROTOCOL_MAGIC ||
+          GUINT_FROM_BE(hs->handshake_magic) != SOCKMUX_PROTOCOL_HANDSHAKE_MAGIC)
+        {
+          receiver->protocol_version = GUINT_FROM_BE(hs->protocol_version);
+          g_byte_array_remove_range(receiver->input_buf, 0, sizeof(*hs));
+        }
+      else
+        {
+          g_signal_emit(receiver, signals[SIGNAL_PROTOCOL_ERROR], 0);
+          return;
+        }
+
+      receiver->handshake_received = TRUE;
+    }
 
   while ((len = dispatch_message(receiver)))
     {
@@ -144,7 +171,6 @@ async_read_cb (GObject *source,
     return;
 
   receiver = SOCKMUX_RECEIVER(data);
-
   g_return_if_fail(SOCKMUX_IS_RECEIVER(receiver));
 
   len = g_input_stream_read_finish (receiver->input, result, &error);
@@ -248,11 +274,17 @@ sockmux_receiver_class_init (SockMuxReceiverClass *klass)
   object_class->finalize = sockmux_receiver_finalize;
 
   signals[SIGNAL_STREAM_END] =
-  g_signal_new ("stream-end",
-                G_OBJECT_CLASS_TYPE (klass),
-                G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
-                0,
-                NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
+    g_signal_new ("stream-end",
+                  G_OBJECT_CLASS_TYPE (klass),
+                  G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
+                  0,
+                  NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
+  signals[SIGNAL_PROTOCOL_ERROR] =
+    g_signal_new ("protocol-error",
+                  G_OBJECT_CLASS_TYPE (klass),
+                  G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
+                  0,
+                  NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
 }
 
 G_DEFINE_TYPE (SockMuxReceiver, sockmux_receiver, G_TYPE_OBJECT)

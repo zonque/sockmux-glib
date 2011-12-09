@@ -22,7 +22,19 @@
 #ifndef _LIBSOCKMUX_GLIB_MESSAGE_H_
 #define _LIBSOCKMUX_GLIB_MESSAGE_H_
 
+#define SOCKMUX_PROTOCOL_MAGIC            0x7ab938ab
+#define SOCKMUX_PROTOCOL_HANDSHAKE_MAGIC  0x3f9ab044
+
+struct _SockMuxHandshake {
+  guint32 magic;
+  guint32 handshake_magic;
+  guint32 protocol_version;
+} __attribute__((packed));
+
+typedef struct _SockMuxHandshake SockMuxHandshake;
+
 struct _SockMuxMessage {
+  guint32 magic;
   guint32 message_id;
   guint32 length;
   guchar data[0];

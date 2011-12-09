@@ -25,6 +25,8 @@
 #include "message.h"
 #include "sender.h"
 
+#define PROTOCOL_VERSION 1
+
 struct _SockMuxSender {
   GObject  parent;
 
@@ -169,6 +171,7 @@ sockmux_sender_send (SockMuxSender  *sender,
   SockMuxMessage msg;
   g_return_if_fail(SOCKMUX_IS_SENDER(sender));
 
+  msg.magic = GUINT_TO_BE(SOCKMUX_PROTOCOL_MAGIC);
   msg.message_id = GUINT_TO_BE(message_id);
   msg.length = GUINT_TO_BE(size);
   g_byte_array_append(sender->output_buf, (guchar *) &msg, sizeof(msg));
@@ -185,9 +188,18 @@ sockmux_sender_init (SockMuxSender *sender)
 SockMuxSender *sockmux_sender_new (GOutputStream *stream)
 {
   SockMuxSender *sender = g_object_new(SOCKMUX_TYPE_SENDER, NULL);
+  SockMuxHandshake hs;
+  
   sender->output = stream;
   sender->output_cancellable = g_cancellable_new();
   sender->output_buf = g_byte_array_new();
+
+  /* send protocol handshake */
+  hs.magic = GUINT_TO_BE(SOCKMUX_PROTOCOL_MAGIC);
+  hs.handshake_magic = GUINT_TO_BE(SOCKMUX_PROTOCOL_HANDSHAKE_MAGIC);
+  hs.protocol_version = GUINT_TO_BE(PROTOCOL_VERSION);
+  g_byte_array_append(sender->output_buf, &hs, sizeof(hs));
+  feed_output_stream(sender);
 
   return sender;
 }
