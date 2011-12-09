@@ -177,7 +177,7 @@ feed_output_stream (SockMuxSender *sender)
 void
 sockmux_sender_send (SockMuxSender  *sender,
                      guint           message_id,
-                     const guint8   *data,
+                     gconstpointer   data,
                      gsize           size)
 {
   SockMuxMessage msg;
@@ -193,7 +193,7 @@ sockmux_sender_send (SockMuxSender  *sender,
   msg.magic = GUINT_TO_BE(SOCKMUX_PROTOCOL_MAGIC);
   msg.message_id = GUINT_TO_BE(message_id);
   msg.length = GUINT_TO_BE(size);
-  g_byte_array_append(sender->output_buf, (guchar *) &msg, sizeof(msg));
+  g_byte_array_append(sender->output_buf, (gconstpointer) &msg, sizeof(msg));
   g_byte_array_append(sender->output_buf, data, size);
 
   feed_output_stream(sender);

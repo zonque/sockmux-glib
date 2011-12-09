@@ -41,7 +41,7 @@ struct _SockMuxSenderClass {
 
 void sockmux_sender_send (SockMuxSender  *sender,
                           guint           message_id,
-                          const guint8   *data,
+                          gconstpointer   data,
                           gsize           size);
 
 #define sockmux_sender_send_msg(S,MESSAGEID) \
