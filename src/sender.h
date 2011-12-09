@@ -44,8 +44,8 @@ void sockmux_sender_send (SockMuxSender  *sender,
                           const guint8   *data,
                           gsize           size);
 
-#define sockmux_sender_send_msg (sender, message_id) \
-        sockmux_sender_send (sender, message_id, NULL, 0)
+#define sockmux_sender_send_msg (s,mid) \
+        sockmux_sender_send (s,mid,NULL,0)
 
 void sockmux_sender_set_max_output_queue (SockMuxSender *sender,
                                           guint max_output_queue);
