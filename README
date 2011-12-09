@@ -19,8 +19,9 @@ or one of its subclasses:
          +----GMemoryInputStream
          +----GUnixInputStream
 
-  /*** Receiver demo ***/
+  /*** Receiver example ***/
 
+  #include <glib.h>
   #include <gio/gio.h>
   #include <sockmux-glib/receiver.h>
 
@@ -33,11 +34,11 @@ or one of its subclasses:
 
   static void message_callback(SockMuxReceiver *receiver,
                                guint message_id,
-                               const guint8 *data,
+                               gconstpointer data,
                                guint size,
                                gpointer userdata)
   {
-    g_message("Callback for message %08x received!", message_id);
+    g_message("Callback for message %08x received, size = %d!", message_id, size);
   }
 
   void start(GInputStream *input)
@@ -61,8 +62,9 @@ or an instance of one of the subclasses:
        +----GMemoryOutputStream
        +----GUnixOutputStream
 
-  /*** Sender demo ***/
+  /*** Sender example ***/
 
+  #include <glib.h>
   #include <gio/gio.h>
   #include <sockmux-glib/sender.h>
 
@@ -73,7 +75,7 @@ or an instance of one of the subclasses:
     /* set up the sender, passing the output stream */
     sender = sockmux_sender_new(output);
 
-    /* send some data. The receiver example above should catch and dispatch it */
+    /* send some data. The receiver example above should catch it */
     sockmux_sender_send(sender, 0x2342, "Hello world", strlen("Hello world"));
   }
 
