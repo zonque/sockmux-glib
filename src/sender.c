@@ -22,7 +22,7 @@
 #include <glib.h>
 #include <gio/gio.h>
 
-#include "message.h"
+#include "protocol.h"
 #include "sender.h"
 
 #define PROTOCOL_VERSION 1
@@ -198,7 +198,7 @@ SockMuxSender *sockmux_sender_new (GOutputStream *stream)
   hs.magic = GUINT_TO_BE(SOCKMUX_PROTOCOL_MAGIC);
   hs.handshake_magic = GUINT_TO_BE(SOCKMUX_PROTOCOL_HANDSHAKE_MAGIC);
   hs.protocol_version = GUINT_TO_BE(PROTOCOL_VERSION);
-  g_byte_array_append(sender->output_buf, &hs, sizeof(hs));
+  g_byte_array_append(sender->output_buf, (guint8 *) &hs, sizeof(hs));
   feed_output_stream(sender);
 
   return sender;

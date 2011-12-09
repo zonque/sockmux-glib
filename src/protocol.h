@@ -19,8 +19,8 @@
  * MA 02110-1301 USA.
  */
 
-#ifndef _LIBSOCKMUX_GLIB_MESSAGE_H_
-#define _LIBSOCKMUX_GLIB_MESSAGE_H_
+#ifndef _LIBSOCKMUX_GLIB_PROTOCOL_H_
+#define _LIBSOCKMUX_GLIB_PROTOCOL_H_
 
 #define SOCKMUX_PROTOCOL_MAGIC            0x7ab938ab
 #define SOCKMUX_PROTOCOL_HANDSHAKE_MAGIC  0x3f9ab044
@@ -42,4 +42,4 @@ struct _SockMuxMessage {
 
 typedef struct _SockMuxMessage SockMuxMessage;
 
-#endif /* _LIBSOCKMUX_GLIB_MESSAGE_H_ */
+#endif /* _LIBSOCKMUX_GLIB_PROTOCOL_H_ */

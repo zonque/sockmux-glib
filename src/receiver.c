@@ -22,7 +22,7 @@
 #include <glib.h>
 #include <gio/gio.h>
 
-#include "message.h"
+#include "protocol.h"
 #include "receiver.h"
 
 struct _SockMuxReceiverCallback {
