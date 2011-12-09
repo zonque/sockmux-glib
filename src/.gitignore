@@ -1,0 +1,7 @@
+.dirstamp
+.deps/
+.libs/
+*.la
+*.lo
+libsockmux-glib.pc
+.*swp
