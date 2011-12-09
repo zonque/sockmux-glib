@@ -3,8 +3,8 @@ exec_prefix=@exec_prefix@
 libdir=@libdir@
 includedir=@includedir@/sockmux-glib/
 
-Name: libabc
-Description: Library socket communication muxing
+Name: libsockmux-glib
+Description: Library for muxing communication channels over sockets
 Version: @VERSION@
 Libs: -L${libdir} -labc
 Libs.private:
