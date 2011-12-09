@@ -56,7 +56,7 @@ static void receiver_cb (SockMuxReceiver *rec,
 
   if (message_id != step)
     {
-      g_error("message_id = %d, step = %s", message_id, step);
+      g_error("message_id = %d, step = %d", message_id, step);
       g_main_loop_quit(loop);
       return;
     }

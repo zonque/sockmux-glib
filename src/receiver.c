@@ -327,7 +327,7 @@ sockmux_receiver_class_init (SockMuxReceiverClass *klass)
   pspec = g_param_spec_int(SOCKMUX_RECEIVER_PROP_MAX_MESSAGE_SIZE,
                            "The maximum length of an incoming message",
                            "Get the number",
-                           0, G_MAXUINT, 0,
+                           0, G_MAXINT, 0,
                            G_PARAM_READWRITE);
   g_object_class_install_property (object_class, PROP_MAX_MESSAGE_SIZE, pspec);
 

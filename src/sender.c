@@ -273,7 +273,7 @@ sockmux_sender_class_init (SockMuxSenderClass *klass)
   pspec = g_param_spec_int(SOCKMUX_SENDER_PROP_MAX_OUTPUT_QUEUE,
                            "The maximum length of the output queue",
                            "Get the number",
-                           0, G_MAXUINT, 0,
+                           0, G_MAXINT, 0,
                            G_PARAM_READWRITE);
   g_object_class_install_property (object_class, PROP_MAX_OUTPUT_QUEUE, pspec);
 
