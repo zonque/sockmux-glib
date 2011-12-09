@@ -21,7 +21,8 @@ LIB_CURRENT=1
 LIB_REVISION=0
 LIB_AGE=1
 
-include_HEADERS = src/libsockmux-glib.h
+includedir = $(prefix)/include/sockmux-glib/
+include_HEADERS = src/sender.h src/receiver.h
 lib_LTLIBRARIES = src/libsockmux-glib.la
 
 src_libsockmux_glib_la_SOURCES =\
