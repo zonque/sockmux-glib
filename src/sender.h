@@ -26,6 +26,8 @@
 
 G_BEGIN_DECLS
 
+#define SOCKMUX_SENDER_PROP_MAX_OUTPUT_QUEUE "max-output-queue"
+
 typedef struct _SockMuxSender      SockMuxSender;
 typedef struct _SockMuxSenderClass SockMuxSenderClass;
 
@@ -34,13 +36,18 @@ struct _SockMuxSenderClass {
 
   /* signals */
   void (* stream_end) (void);
+  void (* stream_overflow) (void);
 };
 
-void
-sockmux_sender_send (SockMuxSender  *sender,
-                     guint           message_id,
-                     const guint8   *data,
-                     gsize           size);
+void sockmux_sender_send (SockMuxSender  *sender,
+                          guint           message_id,
+                          const guint8   *data,
+                          gsize           size);
+
+void sockmux_sender_set_max_output_queue (SockMuxSender *sender,
+                                          guint max_output_queue);
+
+void sockmux_sender_reset (SockMuxSender *sender);
 
 SockMuxSender *sockmux_sender_new(GOutputStream *stream);
 

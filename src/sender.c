@@ -30,16 +30,17 @@
 struct _SockMuxSender {
   GObject  parent;
 
-  gint fd;
   GOutputStream *output;
   GByteArray    *output_buf;
-  GCancellable  *output_cancellable;  
+  GCancellable  *output_cancellable;
+  guint max_output_queue;
 };
 
 static GObjectClass *parent_class = NULL;
 
 enum {
   SIGNAL_WRITE_ERROR,
+  SIGNAL_STREAM_OVERFLOW,
   SIGNAL_LAST
 };
 
@@ -47,6 +48,7 @@ static gint signals[SIGNAL_LAST];
 
 enum {
   PROP_0,
+  PROP_MAX_OUTPUT_QUEUE,
 };
 
 static void
@@ -56,11 +58,14 @@ sockmux_sender_get_property (GObject    *object,
                              GParamSpec *pspec)
 {
   SockMuxSender *sender = SOCKMUX_SENDER(object);
-
   g_return_if_fail(SOCKMUX_IS_SENDER(sender));
 
   switch (property_id)
     {
+      case PROP_MAX_OUTPUT_QUEUE:
+        g_value_set_int(value, sender->max_output_queue);
+        break;
+
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
     }
@@ -72,8 +77,15 @@ sockmux_sender_set_property (GObject      *object,
                              const GValue *value,
                              GParamSpec   *pspec)
 {
+  SockMuxSender *sender = SOCKMUX_SENDER(object);
+  g_return_if_fail(SOCKMUX_IS_SENDER(sender));
+
   switch (property_id)
     {
+      case PROP_MAX_OUTPUT_QUEUE:
+        sender->max_output_queue = g_value_get_int(value);
+        break;
+
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
     }
@@ -171,6 +183,13 @@ sockmux_sender_send (SockMuxSender  *sender,
   SockMuxMessage msg;
   g_return_if_fail(SOCKMUX_IS_SENDER(sender));
 
+  if (sender->max_output_queue > 0 &&
+      (sender->output_buf->len + size) > sender->max_output_queue)
+    {
+      g_signal_emit(sender, signals[SIGNAL_STREAM_OVERFLOW], 0);
+      return;
+    }
+
   msg.magic = GUINT_TO_BE(SOCKMUX_PROTOCOL_MAGIC);
   msg.message_id = GUINT_TO_BE(message_id);
   msg.length = GUINT_TO_BE(size);
@@ -178,6 +197,23 @@ sockmux_sender_send (SockMuxSender  *sender,
   g_byte_array_append(sender->output_buf, data, size);
 
   feed_output_stream(sender);
+}
+
+void
+sockmux_sender_set_max_output_queue (SockMuxSender *sender,
+                                     guint max_output_queue)
+{
+  g_return_if_fail(SOCKMUX_IS_SENDER(sender));
+  sender->max_output_queue = max_output_queue;
+}
+
+void
+sockmux_sender_reset (SockMuxSender *sender)
+{
+  g_return_if_fail(SOCKMUX_IS_SENDER(sender));
+  g_byte_array_set_size(sender->output_buf, 0);
+  g_output_stream_flush(sender->output, NULL, NULL);
+  g_output_stream_clear_pending(sender->output);
 }
 
 static void
@@ -225,6 +261,7 @@ static void
 sockmux_sender_class_init (SockMuxSenderClass *klass)
 {
   GObjectClass *object_class;
+  GParamSpec *pspec;
 
   parent_class = (GObjectClass *) g_type_class_peek_parent (klass);
   object_class = (GObjectClass *) klass;
@@ -233,8 +270,22 @@ sockmux_sender_class_init (SockMuxSenderClass *klass)
   object_class->set_property = sockmux_sender_set_property;
   object_class->finalize = sockmux_sender_finalize;
 
+  pspec = g_param_spec_int(SOCKMUX_SENDER_PROP_MAX_OUTPUT_QUEUE,
+                           "The maximum length of the output queue",
+                           "Get the number",
+                           0, G_MAXUINT, 0,
+                           G_PARAM_READWRITE);
+  g_object_class_install_property (object_class, PROP_MAX_OUTPUT_QUEUE, pspec);
+
   signals[SIGNAL_WRITE_ERROR] =
     g_signal_new ("write-error",
+                  G_OBJECT_CLASS_TYPE (klass),
+                  G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
+                  0,
+                  NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
+  
+  signals[SIGNAL_STREAM_OVERFLOW] =
+    g_signal_new ("stream-overflow",
                   G_OBJECT_CLASS_TYPE (klass),
                   G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
                   0,

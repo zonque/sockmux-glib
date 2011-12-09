@@ -43,7 +43,9 @@ struct _SockMuxReceiver {
   gboolean       handshake_received;
   guint          protocol_version;
 
-  GSList *callbacks;
+  GSList        *callbacks;
+  guint          max_message_size;
+  guint          skip;
 };
 
 static GObjectClass *parent_class = NULL;
@@ -58,6 +60,7 @@ static guint signals[SIGNAL_LAST];
 
 enum {
   PROP_0,
+  PROP_MAX_MESSAGE_SIZE,
 };
 
 static void
@@ -67,11 +70,14 @@ sockmux_receiver_get_property (GObject    *object,
                                GParamSpec *pspec)
 {
   SockMuxReceiver *receiver = SOCKMUX_RECEIVER(object);
-
   g_return_if_fail(SOCKMUX_IS_RECEIVER(receiver));
 
   switch (property_id)
     {
+      case PROP_MAX_MESSAGE_SIZE:
+        g_value_set_int(value, receiver->max_message_size);
+        break;
+
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
     }
@@ -83,8 +89,15 @@ sockmux_receiver_set_property (GObject      *object,
                                const GValue *value,
                                GParamSpec   *pspec)
 {
+  SockMuxReceiver *receiver = SOCKMUX_RECEIVER(object);
+  g_return_if_fail(SOCKMUX_IS_RECEIVER(receiver));
+
   switch (property_id)
     {
+      case PROP_MAX_MESSAGE_SIZE:
+        receiver->max_message_size = g_value_get_int(value);
+        break;
+
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
     }
@@ -165,6 +178,7 @@ async_read_cb (GObject *source,
   gsize len;
   GError *error = NULL;
   SockMuxReceiver *receiver;
+  guint offset = 0;
  
   /* FIXME: is there really no clean solution to cancel a pending async operation!? */
   if (g_input_stream_is_closed(G_INPUT_STREAM(source)))
@@ -188,8 +202,27 @@ async_read_cb (GObject *source,
       return;
     }
 
-  g_byte_array_append(receiver->input_buf, receiver->input_read_buffer, len);
-  dispatch_input(receiver);
+  if (receiver->skip > 0)
+    {
+      if (receiver->skip >= len)
+        {
+          receiver->skip -= len;
+          len = 0;
+        }
+      else
+        {
+          offset = receiver->skip;
+          len -= receiver->skip;
+          receiver->skip = 0;
+        }
+    }
+
+  if (len > 0)
+    {
+      g_byte_array_append(receiver->input_buf, receiver->input_read_buffer + offset, len);
+      dispatch_input(receiver);
+    }
+
   g_input_stream_read_async(receiver->input,
                             receiver->input_read_buffer,
                             sizeof(receiver->input_read_buffer),
@@ -226,6 +259,13 @@ void sockmux_receiver_connect (SockMuxReceiver *receiver,
   cb->userdata = userdata;
 
   receiver->callbacks = g_slist_append(receiver->callbacks, cb);
+}
+
+void sockmux_receiver_set_max_message_size (SockMuxReceiver *receiver,
+                                            guint max_message_size)
+{
+  g_return_if_fail(SOCKMUX_IS_RECEIVER(receiver));
+  receiver->max_message_size = max_message_size;
 }
 
 SockMuxReceiver *sockmux_receiver_new (GInputStream *stream)
@@ -265,6 +305,7 @@ static void
 sockmux_receiver_class_init (SockMuxReceiverClass *klass)
 {
   GObjectClass *object_class;
+  GParamSpec *pspec;
 
   parent_class = (GObjectClass *) g_type_class_peek_parent (klass);
   object_class = (GObjectClass *) klass;
@@ -272,6 +313,13 @@ sockmux_receiver_class_init (SockMuxReceiverClass *klass)
   object_class->get_property = sockmux_receiver_get_property;
   object_class->set_property = sockmux_receiver_set_property;
   object_class->finalize = sockmux_receiver_finalize;
+
+  pspec = g_param_spec_int(SOCKMUX_RECEIVER_PROP_MAX_MESSAGE_SIZE,
+                           "The maximum length of an incoming message",
+                           "Get the number",
+                           0, G_MAXUINT, 0,
+                           G_PARAM_READWRITE);
+  g_object_class_install_property (object_class, PROP_MAX_MESSAGE_SIZE, pspec);
 
   signals[SIGNAL_STREAM_END] =
     g_signal_new ("stream-end",

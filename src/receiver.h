@@ -26,6 +26,8 @@
 
 G_BEGIN_DECLS
 
+#define SOCKMUX_RECEIVER_PROP_MAX_MESSAGE_SIZE "max-message-size"
+
 typedef struct _SockMuxReceiver      SockMuxReceiver;
 typedef struct _SockMuxReceiverClass SockMuxReceiverClass;
 
