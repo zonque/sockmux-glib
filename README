@@ -71,7 +71,7 @@ or an instance of one of the subclasses:
   void start(GOutputStream *output)
   {
     /* set up the sender, passing the output stream */
-    receiver = sockmux_sender_new(output);
+    sender = sockmux_sender_new(output);
 
     /* send some data. The receiver example above should catch and dispatch it */
     sockmux_sender_send(sender, 0x2342, "Hello world", strlen("Hello world"));
