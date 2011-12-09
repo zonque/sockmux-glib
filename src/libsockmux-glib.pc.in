@@ -6,6 +6,6 @@ includedir=@includedir@/sockmux-glib/
 Name: libsockmux-glib
 Description: Library for muxing communication channels over sockets
 Version: @VERSION@
-Libs: -L${libdir} -labc
+Libs: -L${libdir} -lsockmux-glib
 Libs.private:
 Cflags: -I${includedir}
