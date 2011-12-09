@@ -37,7 +37,7 @@ or one of its subclasses:
                                guint size,
                                gpointer userdata)
   {
-    g_message("Callback for message %08x received!");
+    g_message("Callback for message %08x received!", message_id);
   }
 
   void start(GInputStream *input)
