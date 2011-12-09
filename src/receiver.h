@@ -36,6 +36,7 @@ struct _SockMuxReceiverClass {
 
   /* signals */
   void (* stream_end) (void);
+  void (* message_dropped) (void);
 };
 
 typedef void (* SockMuxReceiverCallbackFunc) (SockMuxReceiver *receiver,
@@ -43,6 +44,9 @@ typedef void (* SockMuxReceiverCallbackFunc) (SockMuxReceiver *receiver,
                                               const guint8 *data,
                                               guint size,
                                               gpointer userdata);
+
+void sockmux_receiver_set_max_message_size (SockMuxReceiver *receiver,
+                                            guint max_message_size);
 
 void sockmux_receiver_connect (SockMuxReceiver *receiver,
                                guint message_id,

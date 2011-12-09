@@ -53,6 +53,7 @@ static GObjectClass *parent_class = NULL;
 enum {
   SIGNAL_PROTOCOL_ERROR,
   SIGNAL_STREAM_END,
+  SIGNAL_MESSAGE_DROPPED,
   SIGNAL_LAST
 };
 
@@ -125,6 +126,15 @@ dispatch_message (SockMuxReceiver *receiver)
 
   msg_len = GUINT_FROM_BE(msg->length);
   msg_id = GUINT_FROM_BE(msg->message_id);
+
+  if (receiver->max_message_size > 0 &&
+      msg_len > receiver->max_message_size)
+    {
+      g_signal_emit(receiver, signals[SIGNAL_MESSAGE_DROPPED], 0);
+      receiver->skip = msg_len;
+
+      return G_UNLIKELY(msg_len > available_len) ? available_len : msg_len;
+    }
 
   if (available_len < msg_len + sizeof(*msg))
     return 0;
@@ -329,6 +339,12 @@ sockmux_receiver_class_init (SockMuxReceiverClass *klass)
                   NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
   signals[SIGNAL_PROTOCOL_ERROR] =
     g_signal_new ("protocol-error",
+                  G_OBJECT_CLASS_TYPE (klass),
+                  G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
+                  0,
+                  NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
+  signals[SIGNAL_MESSAGE_DROPPED] =
+    g_signal_new ("message-dropped",
                   G_OBJECT_CLASS_TYPE (klass),
                   G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
                   0,
