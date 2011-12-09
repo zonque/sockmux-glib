@@ -19,37 +19,37 @@ or one of its subclasses:
          +----GMemoryInputStream
          +----GUnixInputStream
 
-/*** Receiver demo ***/
+  /*** Receiver demo ***/
 
-#include <gio/gio.h>
-#include <sockmux-glib/receiver.h>
+  #include <gio/gio.h>
+  #include <sockmux-glib/receiver.h>
 
-static SockMuxReceiver *receiver;
+  static SockMuxReceiver *receiver;
 
-/* 
- * This message is called for all received message IDs
- * that it has been registered to.
- */
+  /* 
+   * This message is called for all received message IDs
+   * that it has been registered to.
+   */
 
-static void message_callback(SockMuxReceiver *receiver,
-                             guint message_id,
-                             const guint8 *data,
-                             guint size,
-                             gpointer userdata)
-{
-  g_message("Callback for message %08x received!");
-}
+  static void message_callback(SockMuxReceiver *receiver,
+                               guint message_id,
+                               const guint8 *data,
+                               guint size,
+                               gpointer userdata)
+  {
+    g_message("Callback for message %08x received!");
+  }
 
-void start(GInputStream *input)
-{
-  /* set up the receiver, passing the input stream */
-  receiver = sockmux_receiver_new(input);
+  void start(GInputStream *input)
+  {
+    /* set up the receiver, passing the input stream */
+    receiver = sockmux_receiver_new(input);
 
-  /* register a message id and connect it to our callback function */
-  sockmux_receiver_connect(receiver, 0x2342, message_callback, NULL);
+    /* register a message id and connect it to our callback function */
+    sockmux_receiver_connect(receiver, 0x2342, message_callback, NULL);
 
-  /* That's it. Now enter the run loop and wait for messages to arrive. */
-}
+    /* That's it. Now enter the run loop and wait for messages to arrive. */
+  }
 
 
 The sender's side is as easy. Here, we assume you have a GOutputStream,
@@ -61,19 +61,19 @@ or an instance of one of the subclasses:
        +----GMemoryOutputStream
        +----GUnixOutputStream
 
-/*** Sender demo ***/
+  /*** Sender demo ***/
 
-#include <gio/gio.h>
-#include <sockmux-glib/sender.h>
+  #include <gio/gio.h>
+  #include <sockmux-glib/sender.h>
 
-static SockMuxSender *sender;
+  static SockMuxSender *sender;
 
-void start(GOutputStream *output)
-{
-  /* set up the sender, passing the output stream */
-  receiver = sockmux_sender_new(output);
+  void start(GOutputStream *output)
+  {
+    /* set up the sender, passing the output stream */
+    receiver = sockmux_sender_new(output);
 
-  /* send some data. The receiver example above should catch and dispatch it */
-  sockmux_sender_send(sender, 0x2342, "Hello world", strlen("Hello world"));
-}
+    /* send some data. The receiver example above should catch and dispatch it */
+    sockmux_sender_send(sender, 0x2342, "Hello world", strlen("Hello world"));
+  }
 
