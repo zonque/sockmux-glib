@@ -4,9 +4,17 @@ libsockmux is a simple library for muxing data streams on a message base
 onto a single socket using GIO data types. The interface offered to
 applications is simple and straight forward.
 
-The code is licensed under the LGPL v2.
-
 It should be easy to port the protocol to more languages and environments.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as
+published by the Free Software Foundation; either version 2 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Lesser General Public License for more details.
 
 An example usually explains things best, so here we go.
 
