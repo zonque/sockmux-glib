@@ -1,22 +1,30 @@
 # Introduction
 
-libsockmux is a simple library for muxing data streams on a message base
-onto a single socket using GIO data types. The interface offered to
-applications is simple and straight forward.
+libsockmux specifies a simple way for muxing messages and data streams
+onto a single socket for network and local communication streams.
 
-It should be easy to port the protocol to more languages and environments.
+libsockmux-glib is an implementation of this protocol base using GIO
+data types and uses glib functions internally. The interface offered
+to applications is very simple and straight forward.
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as
-published by the Free Software Foundation; either version 2 of the
-License, or (at your option) any later version.
+The protocol uses a 32-bit magic for consitency checks which must be
+provided when setting up the sender and the receiver.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
+# License
 
-An example usually explains things best, so here we go.
+> This program is free software; you can redistribute it and/or modify
+> it under the terms of the GNU Lesser General Public License as
+> published by the Free Software Foundation; either version 2 of the
+> License, or (at your option) any later version.
+> 
+> This program is distributed in the hope that it will be useful,
+> but WITHOUT ANY WARRANTY; without even the implied warranty of
+> MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> GNU Lesser General Public License for more details.
+
+#Examples
+
+Examples usually explain things best, so here we go.
 
 ##Receiver example
 
@@ -25,11 +33,11 @@ already. Most probably, this would come from a set up TCP or socket
 connection. The library doesn't care, as long as you provide a GInputStream,
 or one of its subclasses:
     
-    +----GInputStream
-            +----GFilterInputStream
-            +----GFileInputStream
-            +----GMemoryInputStream
-            +----GUnixInputStream
+>     +----GInputStream
+>             +----GFilterInputStream
+>             +----GFileInputStream
+>             +----GMemoryInputStream
+>             +----GUnixInputStream
 
 The magic passed to create should be the same on both sides, of course.
 
@@ -71,13 +79,11 @@ The magic passed to create should be the same on both sides, of course.
 The sender's side is as easy. Here, we assume you have a GOutputStream,
 or an instance of one of the subclasses:
 
-    +----GOutputStream
-          +----GFilterOutputStream
-          +----GFileOutputStream
-          +----GMemoryOutputStream
-          +----GUnixOutputStream
-
-Make sure you pass the same magic again.
+>     +----GOutputStream
+>           +----GFilterOutputStream
+>           +----GFileOutputStream
+>           +----GMemoryOutputStream
+>           +----GUnixOutputStream
 
     #include <glib.h>
     #include <gio/gio.h>
