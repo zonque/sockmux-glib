@@ -16,3 +16,4 @@ configure
 libtool
 stamp-h1
 test-libsockmux-glib
+*.swp

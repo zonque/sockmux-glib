@@ -31,6 +31,7 @@
 #include "src/sender.h"
 #include "src/receiver.h"
 
+/* just a random number ... */
 #define SOCKMUX_PROTOCOL_MAGIC 0x7ab938ab
 
 static GMainLoop *loop;
