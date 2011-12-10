@@ -28,7 +28,7 @@ lib_LTLIBRARIES = src/libsockmux-glib.la
 src_libsockmux_glib_la_SOURCES =\
 	src/sender.h src/sender.c \
 	src/receiver.h src/receiver.c \
-	src/message.h
+	src/protocol.h
 
 src_libsockmux_glib_la_LDFLAGS = $(AM_LDFLAGS) \
 	-version-info $(LIB_CURRENT):$(LIB_REVISION):$(LIB_AGE)
