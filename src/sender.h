@@ -52,7 +52,8 @@ void sockmux_sender_set_max_output_queue (SockMuxSender *sender,
 
 void sockmux_sender_reset (SockMuxSender *sender);
 
-SockMuxSender *sockmux_sender_new(GOutputStream *stream);
+SockMuxSender *sockmux_sender_new(GOutputStream *stream,
+                                  guint magic);
 
 GType sockmux_sender_get_type (void);
 #define SOCKMUX_TYPE_SENDER             sockmux_sender_get_type()

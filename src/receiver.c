@@ -41,6 +41,7 @@ struct _SockMuxReceiver {
   guchar         input_read_buffer[8192];
   GCancellable  *input_cancellable;
   gboolean       handshake_received;
+  guint          magic;
   guint          protocol_version;
 
   GSList        *callbacks;
@@ -118,7 +119,7 @@ dispatch_message (SockMuxReceiver *receiver)
   if (available_len < sizeof(*msg))
     return 0;
 
-  if (GUINT_FROM_BE(msg->magic) != SOCKMUX_PROTOCOL_MAGIC)
+  if (GUINT_FROM_BE(msg->magic) != receiver->magic)
     {
       g_signal_emit(receiver, signals[SIGNAL_PROTOCOL_ERROR], 0);
       return 0;
@@ -159,8 +160,7 @@ dispatch_input (SockMuxReceiver *receiver)
   if (G_UNLIKELY(!receiver->handshake_received))
     {
       SockMuxHandshake *hs = (SockMuxHandshake *) receiver->input_buf->data;
-      if (GUINT_FROM_BE(hs->magic) != SOCKMUX_PROTOCOL_MAGIC ||
-          GUINT_FROM_BE(hs->handshake_magic) != SOCKMUX_PROTOCOL_HANDSHAKE_MAGIC)
+      if (GUINT_FROM_BE(hs->magic) != receiver->magic)
         {
           receiver->protocol_version = GUINT_FROM_BE(hs->protocol_version);
           g_byte_array_remove_range(receiver->input_buf, 0, sizeof(*hs));
@@ -278,11 +278,13 @@ void sockmux_receiver_set_max_message_size (SockMuxReceiver *receiver,
   receiver->max_message_size = max_message_size;
 }
 
-SockMuxReceiver *sockmux_receiver_new (GInputStream *stream)
+SockMuxReceiver *sockmux_receiver_new (GInputStream *stream,
+                                       guint magic)
 {
   SockMuxReceiver *receiver = g_object_new(SOCKMUX_TYPE_RECEIVER, NULL);
 
   receiver->input = stream;
+  receiver->magic = magic;
   receiver->input_buf = g_byte_array_new();
   receiver->input_cancellable = g_cancellable_new();
   

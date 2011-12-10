@@ -53,7 +53,8 @@ void sockmux_receiver_connect (SockMuxReceiver *receiver,
                                SockMuxReceiverCallbackFunc func,
                                gpointer userdata);
 
-SockMuxReceiver *sockmux_receiver_new(GInputStream *stream);
+SockMuxReceiver *sockmux_receiver_new(GInputStream *stream,
+                                      guint magic);
 
 GType sockmux_receiver_get_type (void);
 #define SOCKMUX_TYPE_RECEIVER             sockmux_receiver_get_type()

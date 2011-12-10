@@ -31,6 +31,8 @@
 #include "src/sender.h"
 #include "src/receiver.h"
 
+#define SOCKMUX_PROTOCOL_MAGIC 0x7ab938ab
+
 static GMainLoop *loop;
 static guint step = 0;
 static SockMuxSender *sender = NULL;
@@ -122,14 +124,14 @@ int main(int argc, char *argv[])
   input = g_unix_input_stream_new(fds[0], TRUE);
   output = g_unix_output_stream_new(fds[1], TRUE);
 
-  sender = sockmux_sender_new(output);
+  sender = sockmux_sender_new(output, SOCKMUX_PROTOCOL_MAGIC);
   if (sender == NULL)
     {
       g_error("sockmux_sender_new() failed");
 		  exit(EXIT_FAILURE);
     }
 
-  receiver = sockmux_receiver_new(input);
+  receiver = sockmux_receiver_new(input, SOCKMUX_PROTOCOL_MAGIC);
   if (receiver == NULL)
     {
       g_error("sockmux_receiver_new() failed");

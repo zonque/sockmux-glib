@@ -34,6 +34,7 @@ struct _SockMuxSender {
   GByteArray    *output_buf;
   GCancellable  *output_cancellable;
   guint max_output_queue;
+  guint magic;
 };
 
 static GObjectClass *parent_class = NULL;
@@ -190,7 +191,7 @@ sockmux_sender_send (SockMuxSender  *sender,
       return;
     }
 
-  msg.magic = GUINT_TO_BE(SOCKMUX_PROTOCOL_MAGIC);
+  msg.magic = GUINT_TO_BE(sender->magic);
   msg.message_id = GUINT_TO_BE(message_id);
   msg.length = GUINT_TO_BE(size);
   g_byte_array_append(sender->output_buf, (gconstpointer) &msg, sizeof(msg));
@@ -221,18 +222,19 @@ sockmux_sender_init (SockMuxSender *sender)
 {
 }
 
-SockMuxSender *sockmux_sender_new (GOutputStream *stream)
+SockMuxSender *sockmux_sender_new (GOutputStream *stream,
+                                   guint magic)
 {
   SockMuxSender *sender = g_object_new(SOCKMUX_TYPE_SENDER, NULL);
   SockMuxHandshake hs;
   
   sender->output = stream;
+  sender->magic = magic;
   sender->output_cancellable = g_cancellable_new();
   sender->output_buf = g_byte_array_new();
 
   /* send protocol handshake */
-  hs.magic = GUINT_TO_BE(SOCKMUX_PROTOCOL_MAGIC);
-  hs.handshake_magic = GUINT_TO_BE(SOCKMUX_PROTOCOL_HANDSHAKE_MAGIC);
+  hs.magic = GUINT_TO_BE(sender->magic);
   hs.protocol_version = GUINT_TO_BE(PROTOCOL_VERSION);
   g_byte_array_append(sender->output_buf, (guint8 *) &hs, sizeof(hs));
   feed_output_stream(sender);
