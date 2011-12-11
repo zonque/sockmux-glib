@@ -164,13 +164,12 @@ async_write_cb (GObject      *source,
       return;
     }
 
-  g_byte_array_free(async->array, TRUE);
-  g_object_unref(async->sender);
-
   g_mutex_lock(sender->mutex);
   sender->output_queue = g_slist_remove(sender->output_queue, async);
   g_mutex_unlock(sender->mutex);
 
+  g_byte_array_free(async->array, TRUE);
+  g_object_unref(async->sender);
   g_free(async);
 
   g_output_stream_flush_async(sender->output,
@@ -258,6 +257,7 @@ sockmux_sender_flush_queue (SockMuxSender *sender)
     }
 
   g_slist_free_full(sender->output_queue, g_free);
+  sender->output_queue = NULL;
   g_mutex_unlock(sender->mutex);
 }
 
