@@ -47,6 +47,8 @@ struct _SockMuxReceiver {
   GSList        *callbacks;
   guint          max_message_size;
   guint          skip;
+  gboolean       closing;
+  GMutex        *mutex;
 };
 
 static GObjectClass *parent_class = NULL;
@@ -194,20 +196,22 @@ async_read_cb (GObject *source,
   receiver = SOCKMUX_RECEIVER(data);
   g_return_if_fail(SOCKMUX_IS_RECEIVER(receiver));
 
-  len = g_input_stream_read_finish (receiver->input, result, &error);
+  g_mutex_lock(receiver->mutex);
 
+  if (receiver->closing)
+    goto exit;
+
+  len = g_input_stream_read_finish (receiver->input, result, &error);
   if (len <= 0)
     {
-      if (error == NULL)
+      if (error)
         {
-          /* stream ended */
-          g_signal_emit(receiver, signals[SIGNAL_STREAM_END], 0);
-          return;
+          g_critical("%s(): %s", __func__, error->message);
+          g_error_free (error);
         }
 
-      g_error("%s(): %s", __func__, error->message);
-      g_error_free (error);
-      return;
+      g_signal_emit(receiver, signals[SIGNAL_STREAM_END], 0);
+      goto exit;
     }
 
   if (receiver->skip > 0)
@@ -237,11 +241,16 @@ async_read_cb (GObject *source,
                             G_PRIORITY_DEFAULT,
                             receiver->input_cancellable,
                             async_read_cb, receiver);
+exit:
+  g_mutex_unlock(receiver->mutex);
 }
 
 static void
 sockmux_receiver_init (SockMuxReceiver *receiver)
 {
+  receiver->input_buf = g_byte_array_new();
+  receiver->input_cancellable = g_cancellable_new();
+  receiver->mutex = g_mutex_new();
 }
 
 void sockmux_receiver_connect (SockMuxReceiver *receiver,
@@ -283,9 +292,8 @@ SockMuxReceiver *sockmux_receiver_new (GInputStream *stream,
 
   receiver->input = stream;
   receiver->magic = magic;
-  receiver->input_buf = g_byte_array_new();
-  receiver->input_cancellable = g_cancellable_new();
 
+  /* kick off initial read */
   g_input_stream_read_async(receiver->input,
                             receiver->input_read_buffer,
                             sizeof(receiver->input_read_buffer),
@@ -301,13 +309,20 @@ sockmux_receiver_finalize (GObject *object)
 {
   SockMuxReceiver *receiver = SOCKMUX_RECEIVER(object);
 
-  if (receiver->input_cancellable)
-    g_cancellable_cancel(receiver->input_cancellable);
+  g_mutex_lock(receiver->mutex);
+  receiver->closing = TRUE;
+  g_cancellable_cancel(receiver->input_cancellable);
+  g_mutex_unlock(receiver->mutex);
+
+  g_object_unref(receiver->input_cancellable);
+  receiver->input_cancellable = NULL;
 
   g_byte_array_free(receiver->input_buf, TRUE);
   receiver->input_buf = NULL;
 
   g_slist_free_full(receiver->callbacks, g_free);
+  g_mutex_free(receiver->mutex);
+
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
 
