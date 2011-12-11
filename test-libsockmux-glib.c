@@ -33,6 +33,7 @@
 
 /* just a random number ... */
 #define SOCKMUX_PROTOCOL_MAGIC 0x7ab938ab
+#define N_TESTS 10000
 
 static GMainLoop *loop;
 static guint step = 0;
@@ -41,6 +42,14 @@ static SockMuxReceiver *receiver = NULL;
 static GChecksum *checksum;
 
 static void trigger(void);
+
+static void quit(void)
+{
+  g_checksum_free(checksum);
+  sockmux_sender_reset(sender);
+  g_object_unref(sender);
+  g_main_loop_quit(loop);
+}
 
 static void receiver_cb (SockMuxReceiver *rec,
                          guint message_id,
@@ -53,14 +62,14 @@ static void receiver_cb (SockMuxReceiver *rec,
   if (userdata != rec)
     {
       g_error("userdata = %p, rec = %p", userdata, rec);
-      g_main_loop_quit(loop);
+      quit();
       return;
     }
 
   if (message_id != step)
     {
       g_error("message_id = %d, step = %d", message_id, step);
-      g_main_loop_quit(loop);
+      quit();
       return;
     }
 
@@ -74,7 +83,7 @@ static void receiver_cb (SockMuxReceiver *rec,
       g_error("Checksum mismatch! Expected '%s', got '%s'",
               g_checksum_get_string(checksum),
               g_checksum_get_string(checksum2));
-      g_main_loop_quit(loop);
+      quit();
       return;
     }
 
@@ -87,7 +96,7 @@ static void trigger(void)
   guint8 *data;
   gsize size, i;
 
-  if (step++ < 2000)
+  if (step++ < N_TESTS)
     {
       size = g_random_int_range(0, 1024 * 24);
       data = g_malloc0(size);
@@ -104,7 +113,13 @@ static void trigger(void)
       g_free(data);
     }
   else
-    g_main_loop_quit(loop);
+    quit();
+}
+
+static void receiver_protocol_error(SockMuxReceiver *receiver,
+                                    gpointer userdata)
+{
+  g_critical("protocol error!");
 }
 
 int main(int argc, char *argv[])
@@ -113,7 +128,7 @@ int main(int argc, char *argv[])
   GInputStream *input;
   GOutputStream *output;
 
-  g_type_init();  
+  g_type_init();
   ret = pipe(fds);
 
   if (ret < 0)
@@ -125,6 +140,13 @@ int main(int argc, char *argv[])
   input = g_unix_input_stream_new(fds[0], TRUE);
   output = g_unix_output_stream_new(fds[1], TRUE);
 
+  receiver = sockmux_receiver_new(input, SOCKMUX_PROTOCOL_MAGIC);
+  if (receiver == NULL)
+    {
+      g_error("sockmux_receiver_new() failed");
+		  exit(EXIT_FAILURE);
+    }
+
   sender = sockmux_sender_new(output, SOCKMUX_PROTOCOL_MAGIC);
   if (sender == NULL)
     {
@@ -132,12 +154,8 @@ int main(int argc, char *argv[])
 		  exit(EXIT_FAILURE);
     }
 
-  receiver = sockmux_receiver_new(input, SOCKMUX_PROTOCOL_MAGIC);
-  if (receiver == NULL)
-    {
-      g_error("sockmux_receiver_new() failed");
-		  exit(EXIT_FAILURE);
-    }
+  g_signal_connect(receiver, "protocol-error",
+                   G_CALLBACK(receiver_protocol_error), NULL);
 
   loop = g_main_loop_new(NULL, FALSE);
   checksum = g_checksum_new(G_CHECKSUM_SHA1);

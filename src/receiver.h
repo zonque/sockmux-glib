@@ -37,6 +37,7 @@ struct _SockMuxReceiverClass {
   /* signals */
   void (* stream_end) (void);
   void (* message_dropped) (void);
+  void (* protocol_error) (void);
 };
 
 typedef void (* SockMuxReceiverCallbackFunc) (SockMuxReceiver *receiver,

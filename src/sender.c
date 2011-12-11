@@ -31,11 +31,19 @@ struct _SockMuxSender {
   GObject  parent;
 
   GOutputStream *output;
-  GByteArray    *output_buf;
   GCancellable  *output_cancellable;
-  guint max_output_queue;
-  guint magic;
+  GSList        *output_queue;
+  guint          max_output_queue;
+  guint          magic;
+  GMutex        *mutex;
 };
+
+struct _SockMuxAsync {
+  GByteArray *array;
+  SockMuxSender *sender;
+};
+
+typedef struct _SockMuxAsync SockMuxAsync;
 
 static GObjectClass *parent_class = NULL;
 
@@ -127,14 +135,16 @@ async_write_cb (GObject      *source,
 {
   gsize len;
   GError *error = NULL;
+  SockMuxAsync *async;
   SockMuxSender *sender;
- 
+
   /* FIXME: is there really no clean solution to cancel a pending async operation!? */
   if (g_output_stream_is_closing(G_OUTPUT_STREAM(source)) ||
       g_output_stream_is_closed(G_OUTPUT_STREAM(source)))
     return;
-  
-  sender = SOCKMUX_SENDER(data);
+
+  async = data;
+  sender = async->sender;
   g_return_if_fail(SOCKMUX_IS_SENDER(sender));
 
   len = g_output_stream_write_finish(sender->output, result, &error);
@@ -147,13 +157,21 @@ async_write_cb (GObject      *source,
           g_signal_emit(sender, signals[SIGNAL_WRITE_ERROR], 0);
           return;
         }
-      
+
       g_error("%s() %s\n", __func__, error->message);
       g_error_free(error);
       return;
     }
 
-  g_byte_array_remove_range(sender->output_buf, 0, len);
+  g_byte_array_free(async->array, TRUE);
+  g_object_unref(async->sender);
+
+  g_mutex_lock(sender->mutex);
+  sender->output_queue = g_slist_remove(sender->output_queue, async);
+  g_mutex_unlock(sender->mutex);
+
+  g_free(async);
+
   g_output_stream_flush_async(sender->output,
                               G_PRIORITY_DEFAULT,
                               NULL,
@@ -163,16 +181,83 @@ async_write_cb (GObject      *source,
 static void
 feed_output_stream (SockMuxSender *sender)
 {
-  if (sender->output_buf->len == 0 ||
-      g_output_stream_has_pending(sender->output))
+  SockMuxAsync *async = NULL;
+
+  if (g_output_stream_has_pending(sender->output))
+    return;
+
+  g_mutex_lock(sender->mutex);
+  if (sender->output_queue)
+    {
+      async = sender->output_queue->data;
+      sender->output_queue = g_slist_remove(sender->output_queue, async);
+    }
+  g_mutex_unlock(sender->mutex);
+
+  if (async == NULL)
     return;
 
   g_output_stream_write_async(sender->output,
-                              sender->output_buf->data,
-                              sender->output_buf->len,
+                              async->array->data,
+                              async->array->len,
                               G_PRIORITY_DEFAULT,
                               sender->output_cancellable,
-                              async_write_cb, sender);
+                              async_write_cb, async);
+}
+
+static void
+sockmux_sender_queue (SockMuxSender *sender,
+                      gconstpointer  data1,
+                      guint          size1,
+                      gconstpointer  data2,
+                      guint          size2)
+{
+  SockMuxAsync *async = g_new(SockMuxAsync, 1);
+  async->sender = g_object_ref(sender);
+  async->array = g_byte_array_sized_new(size1 + size2);
+  g_byte_array_append(async->array, (guint8 *) data1, size1);
+  if (data2)
+    g_byte_array_append(async->array, (guint8 *) data2, size2);
+
+  g_mutex_lock(sender->mutex);
+  sender->output_queue = g_slist_append(sender->output_queue, async);
+  g_mutex_unlock(sender->mutex);
+
+  feed_output_stream(sender);
+}
+
+static guint
+sockmux_sender_queue_size (SockMuxSender *sender)
+{
+  guint size = 0;
+  GSList *iter;
+
+  g_mutex_lock(sender->mutex);
+  for (iter = sender->output_queue; iter; iter = iter->next)
+    {
+      SockMuxAsync *async = iter->data;
+      size += async->array->len;
+    }
+  g_mutex_unlock(sender->mutex);
+
+  return size;
+}
+
+static void
+sockmux_sender_flush_queue (SockMuxSender *sender)
+{
+  GSList *iter;
+
+  g_mutex_lock(sender->mutex);
+  for (iter = sender->output_queue; iter; iter = iter->next)
+    {
+      SockMuxAsync *async = iter->data;
+      g_byte_array_free(async->array, TRUE);
+      g_object_unref(async->sender);
+    }
+
+  g_slist_free_full(sender->output_queue, g_free);
+  g_mutex_unlock(sender->mutex);
 }
 
 void
@@ -185,7 +270,7 @@ sockmux_sender_send (SockMuxSender  *sender,
   g_return_if_fail(SOCKMUX_IS_SENDER(sender));
 
   if (sender->max_output_queue > 0 &&
-      (sender->output_buf->len + size) > sender->max_output_queue)
+      sockmux_sender_queue_size(sender) > sender->max_output_queue)
     {
       g_signal_emit(sender, signals[SIGNAL_STREAM_OVERFLOW], 0);
       return;
@@ -194,10 +279,7 @@ sockmux_sender_send (SockMuxSender  *sender,
   msg.magic = GUINT_TO_BE(sender->magic);
   msg.message_id = GUINT_TO_BE(message_id);
   msg.length = GUINT_TO_BE(size);
-  g_byte_array_append(sender->output_buf, (gconstpointer) &msg, sizeof(msg));
-  g_byte_array_append(sender->output_buf, data, size);
-
-  feed_output_stream(sender);
+  sockmux_sender_queue(sender, (gconstpointer) &msg, sizeof(msg), data, size);
 }
 
 void
@@ -212,7 +294,7 @@ void
 sockmux_sender_reset (SockMuxSender *sender)
 {
   g_return_if_fail(SOCKMUX_IS_SENDER(sender));
-  g_byte_array_set_size(sender->output_buf, 0);
+  sockmux_sender_flush_queue(sender);
   g_output_stream_flush(sender->output, NULL, NULL);
   g_output_stream_clear_pending(sender->output);
 }
@@ -220,6 +302,8 @@ sockmux_sender_reset (SockMuxSender *sender)
 static void
 sockmux_sender_init (SockMuxSender *sender)
 {
+  sender->output_cancellable = g_cancellable_new();
+  sender->mutex = g_mutex_new();
 }
 
 SockMuxSender *sockmux_sender_new (GOutputStream *stream,
@@ -227,17 +311,14 @@ SockMuxSender *sockmux_sender_new (GOutputStream *stream,
 {
   SockMuxSender *sender = g_object_new(SOCKMUX_TYPE_SENDER, NULL);
   SockMuxHandshake hs;
-  
+
   sender->output = stream;
   sender->magic = magic;
-  sender->output_cancellable = g_cancellable_new();
-  sender->output_buf = g_byte_array_new();
 
   /* send protocol handshake */
   hs.magic = GUINT_TO_BE(sender->magic);
   hs.protocol_version = GUINT_TO_BE(PROTOCOL_VERSION);
-  g_byte_array_append(sender->output_buf, (guint8 *) &hs, sizeof(hs));
-  feed_output_stream(sender);
+  sockmux_sender_queue(sender, (gconstpointer) &hs, sizeof(hs), NULL, 0);
 
   return sender;
 }
@@ -247,15 +328,20 @@ sockmux_sender_finalize (GObject *object)
 {
   SockMuxSender *sender = SOCKMUX_SENDER(object);
 
-  g_byte_array_free(sender->output_buf, TRUE);
-  sender->output_buf = NULL;
+  sockmux_sender_flush_queue(sender);
 
   if (sender->output_cancellable)
     {
       g_object_unref(sender->output_cancellable);
       sender->output_cancellable = NULL;
     }
-  
+
+  if (sender->mutex)
+    {
+      g_mutex_free(sender->mutex);
+      sender->mutex = NULL;
+    }
+
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
 
@@ -285,7 +371,7 @@ sockmux_sender_class_init (SockMuxSenderClass *klass)
                   G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
                   0,
                   NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
-  
+
   signals[SIGNAL_STREAM_OVERFLOW] =
     g_signal_new ("stream-overflow",
                   G_OBJECT_CLASS_TYPE (klass),

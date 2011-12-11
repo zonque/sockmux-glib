@@ -58,7 +58,7 @@ enum {
   SIGNAL_LAST
 };
 
-static guint signals[SIGNAL_LAST];    
+static guint signals[SIGNAL_LAST];
 
 enum {
   PROP_0,
@@ -162,16 +162,13 @@ dispatch_input (SockMuxReceiver *receiver)
       SockMuxHandshake *hs = (SockMuxHandshake *) receiver->input_buf->data;
       if (GUINT_FROM_BE(hs->magic) != receiver->magic)
         {
-          receiver->protocol_version = GUINT_FROM_BE(hs->protocol_version);
-          g_byte_array_remove_range(receiver->input_buf, 0, sizeof(*hs));
-        }
-      else
-        {
           g_signal_emit(receiver, signals[SIGNAL_PROTOCOL_ERROR], 0);
           return;
         }
 
+      receiver->protocol_version = GUINT_FROM_BE(hs->protocol_version);
       receiver->handshake_received = TRUE;
+      g_byte_array_remove_range(receiver->input_buf, 0, sizeof(*hs));
     }
 
   while ((len = dispatch_message(receiver)))
@@ -189,7 +186,7 @@ async_read_cb (GObject *source,
   GError *error = NULL;
   SockMuxReceiver *receiver;
   guint offset = 0;
- 
+
   /* FIXME: is there really no clean solution to cancel a pending async operation!? */
   if (g_input_stream_is_closed(G_INPUT_STREAM(source)))
     return;
@@ -198,6 +195,7 @@ async_read_cb (GObject *source,
   g_return_if_fail(SOCKMUX_IS_RECEIVER(receiver));
 
   len = g_input_stream_read_finish (receiver->input, result, &error);
+
   if (len <= 0)
     {
       if (error == NULL)
@@ -252,7 +250,7 @@ void sockmux_receiver_connect (SockMuxReceiver *receiver,
                                gpointer userdata)
 {
   SockMuxReceiverCallback *cb;
- 
+
   g_return_if_fail(SOCKMUX_IS_RECEIVER(receiver));
   g_return_if_fail(func != NULL);
 
@@ -287,7 +285,7 @@ SockMuxReceiver *sockmux_receiver_new (GInputStream *stream,
   receiver->magic = magic;
   receiver->input_buf = g_byte_array_new();
   receiver->input_cancellable = g_cancellable_new();
-  
+
   g_input_stream_read_async(receiver->input,
                             receiver->input_read_buffer,
                             sizeof(receiver->input_read_buffer),
@@ -305,7 +303,7 @@ sockmux_receiver_finalize (GObject *object)
 
   if (receiver->input_cancellable)
     g_cancellable_cancel(receiver->input_cancellable);
-  
+
   g_byte_array_free(receiver->input_buf, TRUE);
   receiver->input_buf = NULL;
 
