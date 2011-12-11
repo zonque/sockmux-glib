@@ -121,11 +121,12 @@ async_flush_cb (GObject      *source,
 
   if (error)
     {
-      g_error("%s() %s\n", __func__, error->message);
+      g_critical("%s() %s", __func__, error->message);
+      g_signal_emit(sender, signals[SIGNAL_WRITE_ERROR], 0);
       g_error_free(error);
     }
-
-  feed_output_stream(sender);
+  else
+    feed_output_stream(sender);
 }
 
 static void
@@ -153,13 +154,13 @@ async_write_cb (GObject      *source,
       if (error == NULL)
         {
           /* write error? */
-          g_critical ("Sender write error (%p)", sender);
-          g_signal_emit(sender, signals[SIGNAL_WRITE_ERROR], 0);
+          g_critical("Sender write error (%p)", sender);
           return;
         }
 
-      g_error("%s() %s\n", __func__, error->message);
+      g_critical("%s() %s", __func__, error->message);
       g_error_free(error);
+      g_signal_emit(sender, signals[SIGNAL_WRITE_ERROR], 0);
       return;
     }
 
