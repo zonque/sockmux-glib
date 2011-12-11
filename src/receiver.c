@@ -161,7 +161,13 @@ dispatch_input (SockMuxReceiver *receiver)
 
   if (G_UNLIKELY(!receiver->handshake_received))
     {
-      SockMuxHandshake *hs = (SockMuxHandshake *) receiver->input_buf->data;
+      SockMuxHandshake *hs;
+
+      if (receiver->input_buf->len < sizeof(*hs))
+        return;
+
+      hs = (SockMuxHandshake *) receiver->input_buf->data;
+
       if (GUINT_FROM_BE(hs->magic) != receiver->magic)
         {
           g_signal_emit(receiver, signals[SIGNAL_PROTOCOL_ERROR], 0);
