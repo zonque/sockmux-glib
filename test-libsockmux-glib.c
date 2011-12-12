@@ -98,7 +98,7 @@ static void trigger(void)
 
   if (step++ < N_TESTS)
     {
-      size = g_random_int_range(0, 1024 * 24);
+      size = g_random_int_range(0, 1024 * 1024);
       data = g_malloc0(size);
 
       for (i = 0; i < size; i++)

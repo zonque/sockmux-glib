@@ -26,6 +26,7 @@
 #include "sender.h"
 
 #define PROTOCOL_VERSION 1
+#define DEFAULT_MAX_CHUNK_SIZE (16 * 1024)
 
 struct _SockMuxSender {
   GObject  parent;
@@ -36,11 +37,13 @@ struct _SockMuxSender {
   guint          max_output_queue;
   guint          magic;
   GMutex        *mutex;
+  guint          max_chunk_size;
 };
 
 struct _SockMuxAsync {
   GByteArray *array;
   SockMuxSender *sender;
+  guint offset;
 };
 
 typedef struct _SockMuxAsync SockMuxAsync;
@@ -58,6 +61,7 @@ static gint signals[SIGNAL_LAST];
 enum {
   PROP_0,
   PROP_MAX_OUTPUT_QUEUE,
+  PROP_MAX_CHUNK_SIZE,
 };
 
 static void
@@ -118,7 +122,6 @@ async_flush_cb (GObject      *source,
   g_return_if_fail(SOCKMUX_IS_SENDER(sender));
 
   g_output_stream_flush_finish(G_OUTPUT_STREAM(source), result, &error);
-
   if (error)
     {
       g_critical("%s() %s", __func__, error->message);
@@ -126,7 +129,9 @@ async_flush_cb (GObject      *source,
       g_error_free(error);
     }
   else
-    feed_output_stream(sender);
+    {
+      feed_output_stream(sender);
+    }
 }
 
 static void
@@ -149,6 +154,7 @@ async_write_cb (GObject      *source,
   g_return_if_fail(SOCKMUX_IS_SENDER(sender));
 
   len = g_output_stream_write_finish(sender->output, result, &error);
+
   if (len <= 0)
     {
       if (error == NULL)
@@ -164,13 +170,20 @@ async_write_cb (GObject      *source,
       return;
     }
 
-  g_mutex_lock(sender->mutex);
-  sender->output_queue = g_slist_remove(sender->output_queue, async);
-  g_mutex_unlock(sender->mutex);
+  if (async->offset + len == async->array->len)
+    {
+      g_mutex_lock(sender->mutex);
+      sender->output_queue = g_slist_remove(sender->output_queue, async);
+      g_mutex_unlock(sender->mutex);
 
-  g_byte_array_free(async->array, TRUE);
-  g_object_unref(async->sender);
-  g_free(async);
+      g_byte_array_free(async->array, TRUE);
+      g_object_unref(async->sender);
+      g_free(async);
+    }
+  else
+    {
+      async->offset += len;
+    }
 
   g_output_stream_flush_async(sender->output,
                               G_PRIORITY_DEFAULT,
@@ -181,6 +194,7 @@ async_write_cb (GObject      *source,
 static void
 feed_output_stream (SockMuxSender *sender)
 {
+  guint size;
   SockMuxAsync *async = NULL;
 
   if (g_output_stream_has_pending(sender->output))
@@ -188,19 +202,19 @@ feed_output_stream (SockMuxSender *sender)
 
   g_mutex_lock(sender->mutex);
   if (sender->output_queue)
-    {
-      async = sender->output_queue->data;
-      sender->output_queue = g_slist_remove(sender->output_queue, async);
-    }
+    async = sender->output_queue->data;
   g_mutex_unlock(sender->mutex);
 
   if (async == NULL)
     return;
 
+  size = async->array->len - async->offset;
+  if (size > sender->max_chunk_size)
+    size = sender->max_chunk_size;
+
   g_output_stream_write_async(sender->output,
-                              async->array->data,
-                              async->array->len,
-                              G_PRIORITY_DEFAULT,
+                              async->array->data + async->offset,
+                              size, G_PRIORITY_DEFAULT,
                               sender->output_cancellable,
                               async_write_cb, async);
 }
@@ -212,7 +226,7 @@ sockmux_sender_queue (SockMuxSender *sender,
                       gconstpointer  data2,
                       guint          size2)
 {
-  SockMuxAsync *async = g_new(SockMuxAsync, 1);
+  SockMuxAsync *async = g_new0(SockMuxAsync, 1);
   async->sender = g_object_ref(sender);
   async->array = g_byte_array_sized_new(size1 + size2);
   g_byte_array_append(async->array, (guint8 *) data1, size1);
@@ -236,7 +250,7 @@ sockmux_sender_queue_size (SockMuxSender *sender)
   for (iter = sender->output_queue; iter; iter = iter->next)
     {
       SockMuxAsync *async = iter->data;
-      size += async->array->len;
+      size += async->array->len - async->offset;
     }
   g_mutex_unlock(sender->mutex);
 
@@ -305,6 +319,7 @@ sockmux_sender_init (SockMuxSender *sender)
 {
   sender->output_cancellable = g_cancellable_new();
   sender->mutex = g_mutex_new();
+  sender->max_chunk_size = DEFAULT_MAX_CHUNK_SIZE;
 }
 
 SockMuxSender *sockmux_sender_new (GOutputStream *stream,
@@ -365,6 +380,13 @@ sockmux_sender_class_init (SockMuxSenderClass *klass)
                            0, G_MAXINT, 0,
                            G_PARAM_READWRITE);
   g_object_class_install_property (object_class, PROP_MAX_OUTPUT_QUEUE, pspec);
+
+  pspec = g_param_spec_int(SOCKMUX_SENDER_PROP_MAX_CHUNK_SIZE,
+                           "The maximum size of a single data block to queue",
+                           "Get the number",
+                           0, G_MAXINT, DEFAULT_MAX_CHUNK_SIZE,
+                           G_PARAM_READWRITE);
+  g_object_class_install_property (object_class, PROP_MAX_CHUNK_SIZE, pspec);
 
   signals[SIGNAL_WRITE_ERROR] =
     g_signal_new ("write-error",

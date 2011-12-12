@@ -220,7 +220,7 @@ async_read_cb (GObject *source,
   if (receiver->closing)
     goto exit;
 
-  len = g_input_stream_read_finish (receiver->input, result, &error);
+  len = g_input_stream_read_finish(receiver->input, result, &error);
   if (len <= 0)
     {
       if (error)

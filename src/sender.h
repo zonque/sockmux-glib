@@ -27,6 +27,7 @@
 G_BEGIN_DECLS
 
 #define SOCKMUX_SENDER_PROP_MAX_OUTPUT_QUEUE "max-output-queue"
+#define SOCKMUX_SENDER_PROP_MAX_CHUNK_SIZE   "max-chunk-size"
 
 typedef struct _SockMuxSender      SockMuxSender;
 typedef struct _SockMuxSenderClass SockMuxSenderClass;
