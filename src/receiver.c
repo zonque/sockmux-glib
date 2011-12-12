@@ -26,12 +26,18 @@
 #include "receiver.h"
 
 struct _SockMuxReceiverCallback {
+  SockMuxReceiverCallbackFunc func;
+  gpointer userdata;
+};
+
+struct _SockMuxReceiverFilteredCallback {
   guint message_id;
   SockMuxReceiverCallbackFunc func;
   gpointer userdata;
 };
 
 typedef struct _SockMuxReceiverCallback SockMuxReceiverCallback;
+typedef struct _SockMuxReceiverFilteredCallback SockMuxReceiverFilteredCallback;
 
 struct _SockMuxReceiver {
   GObject  parent;
@@ -45,6 +51,7 @@ struct _SockMuxReceiver {
   guint          protocol_version;
 
   GSList        *callbacks;
+  GSList        *filtered_callbacks;
   guint          max_message_size;
   guint          skip;
   gboolean       closing;
@@ -146,6 +153,12 @@ dispatch_message (SockMuxReceiver *receiver)
   for (iter = receiver->callbacks; iter; iter = iter->next)
     {
       SockMuxReceiverCallback *cb = iter->data;
+      cb->func(receiver, msg_id, msg->data, msg_len, cb->userdata);
+    }
+  
+  for (iter = receiver->filtered_callbacks; iter; iter = iter->next)
+    {
+      SockMuxReceiverFilteredCallback *cb = iter->data;
 
       if (cb->message_id == msg_id)
         cb->func(receiver, msg_id, msg->data, msg_len, cb->userdata);
@@ -260,7 +273,6 @@ sockmux_receiver_init (SockMuxReceiver *receiver)
 }
 
 void sockmux_receiver_connect (SockMuxReceiver *receiver,
-                               guint message_id,
                                SockMuxReceiverCallbackFunc func,
                                gpointer userdata)
 {
@@ -277,11 +289,35 @@ void sockmux_receiver_connect (SockMuxReceiver *receiver,
       return;
     }
 
-  cb->message_id = message_id;
   cb->func = func;
   cb->userdata = userdata;
 
   receiver->callbacks = g_slist_append(receiver->callbacks, cb);
+}
+
+void sockmux_receiver_connect_filtered (SockMuxReceiver *receiver,
+                                        guint message_id,
+                                        SockMuxReceiverCallbackFunc func,
+                                        gpointer userdata)
+{
+  SockMuxReceiverFilteredCallback *cb;
+
+  g_return_if_fail(SOCKMUX_IS_RECEIVER(receiver));
+  g_return_if_fail(func != NULL);
+
+  cb = g_new0(SockMuxReceiverFilteredCallback, 1);
+
+  if (cb == NULL)
+    {
+      g_error("Unable to allocate memory!?");
+      return;
+    }
+
+  cb->message_id = message_id;
+  cb->func = func;
+  cb->userdata = userdata;
+
+  receiver->filtered_callbacks = g_slist_append(receiver->filtered_callbacks, cb);
 }
 
 void sockmux_receiver_set_max_message_size (SockMuxReceiver *receiver,
@@ -327,6 +363,8 @@ sockmux_receiver_finalize (GObject *object)
   receiver->input_buf = NULL;
 
   g_slist_free_full(receiver->callbacks, g_free);
+  g_slist_free_full(receiver->filtered_callbacks, g_free);
+  
   g_mutex_free(receiver->mutex);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);

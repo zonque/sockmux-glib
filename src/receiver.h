@@ -50,9 +50,13 @@ void sockmux_receiver_set_max_message_size (SockMuxReceiver *receiver,
                                             guint max_message_size);
 
 void sockmux_receiver_connect (SockMuxReceiver *receiver,
-                               guint message_id,
                                SockMuxReceiverCallbackFunc func,
                                gpointer userdata);
+
+void sockmux_receiver_connect_filtered (SockMuxReceiver *receiver,
+                                        guint message_id,
+                                        SockMuxReceiverCallbackFunc func,
+                                        gpointer userdata);
 
 SockMuxReceiver *sockmux_receiver_new(GInputStream *stream,
                                       guint magic);

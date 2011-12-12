@@ -107,7 +107,7 @@ static void trigger(void)
       g_checksum_reset(checksum);
       g_checksum_update(checksum, data, size);
 
-      sockmux_receiver_connect(receiver, step, receiver_cb, receiver);
+      sockmux_receiver_connect_filtered(receiver, step, receiver_cb, receiver);
       sockmux_sender_send(sender, step, data, size);
 
       g_free(data);

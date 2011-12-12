@@ -68,8 +68,8 @@ The magic passed to create should be the same on both sides, of course.
       /* set up the receiver, passing the input stream */
       receiver = sockmux_receiver_new(input, MAGIC);
 
-      /* register a message id and connect it to our callback function */
-      sockmux_receiver_connect(receiver, 0x2342, message_callback, NULL);
+      /* register our callback function for message dispatching */
+      sockmux_receiver_connect(receiver, message_callback, NULL);
 
       /* That's it. Now enter the run loop and wait for messages to arrive. */
     }
