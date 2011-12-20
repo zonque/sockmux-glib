@@ -1,6 +1,6 @@
 AC_PREREQ(2.60)
 AC_INIT([libsockmux-glib],
-	[1],
+	[1.1],
 	[sockmux@zonque.org],
 	[libsockmux-glib],
 	[http://github.com/...])

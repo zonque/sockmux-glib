@@ -18,7 +18,7 @@ AM_LDFLAGS = \
 	-Wl,--as-needed
 
 LIB_CURRENT=1
-LIB_REVISION=0
+LIB_REVISION=1
 LIB_AGE=1
 
 includedir = $(prefix)/include/sockmux-glib/
