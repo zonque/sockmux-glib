@@ -56,7 +56,7 @@ The magic passed to create should be the same on both sides, of course.
 
     static void message_callback(SockMuxReceiver *receiver,
                                  guint message_id,
-                                 gconstpointer data,
+                                 const guint8 *data,
                                  guint size,
                                  gpointer userdata)
     {
